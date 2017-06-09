@@ -33,7 +33,12 @@ func New() (*Client, error) {
 }
 
 func (client *Client) Call(method string, params interface{}) (interface{}, error) {
-	encodedArgs, encodeErr := json.Marshal(params)
+	// internal api wants the "params" prefix key. Do it here so consumers dont have
+	// to do this everytime.
+	args := map[string]interface{}{
+		"params": params,
+	}
+	encodedArgs, encodeErr := json.Marshal(args)
 	if encodeErr != nil {
 		return nil, encodeErr
 	}
