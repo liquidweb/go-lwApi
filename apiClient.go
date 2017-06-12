@@ -92,7 +92,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		}
 	}
 	// no LW errors so return the decoded response
-	return mapDecodedResp, nil
+	return decodedResp, nil
 }
 
 /* private */
