@@ -1,12 +1,14 @@
 package main
 
 import (
+	"github.com/spf13/viper"
 	"fmt"
 	lwInternalApi "github.com/liquidweb/go-lwInternalApi"
 )
 
 func main() {
-	apiClient, iErr := lwInternalApi.New()
+	config := viper.New()
+	apiClient, iErr := lwInternalApi.New(config)
 	if iErr != nil {
 		panic(iErr)
 	}
