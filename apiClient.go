@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"crypto/tls"
 )
 
 type Client struct {
@@ -25,7 +26,15 @@ func New(config *viper.Viper) (*Client, error) {
 	if timeout == 0 {
 		timeout = 20
 	}
+
 	httpClient := &http.Client{Timeout: time.Duration(time.Duration(timeout) * time.Second)}
+
+	if config.GetBool("lwInternalApi.secure") != true {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		httpClient.Transport = tr
+	}
 	client := Client{config, httpClient}
 	return &client, nil
 }
@@ -42,7 +51,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		return nil, encodeErr
 	}
 	// formulate the HTTP POST request
-	url := fmt.Sprintf("%s/%s", thisViper.GetString("url"), method)
+	url := fmt.Sprintf("%s/%s", thisViper.GetString("lwInternalApi.url"), method)
 	req, reqErr := http.NewRequest("POST", url, bytes.NewReader(encodedArgs))
 	if reqErr != nil {
 		return nil, reqErr
