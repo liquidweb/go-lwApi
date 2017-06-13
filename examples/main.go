@@ -8,6 +8,13 @@ import (
 
 func main() {
 	config := viper.New()
+	config.SetConfigName(".go-lwInternalApi")
+	config.AddConfigPath("/usr/local/lp/etc")
+	// Match environment variables as well
+	config.AutomaticEnv()
+
+	config.ReadInConfig()
+
 	apiClient, iErr := lwInternalApi.New(config)
 	if iErr != nil {
 		panic(iErr)
