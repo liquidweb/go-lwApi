@@ -8,31 +8,39 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"crypto/tls"
 )
 
 type Client struct {
+	config     *viper.Viper
 	httpClient *http.Client
 }
 
 /* public */
 
-func New() (*Client, error) {
-	if err := initConfig(); err != nil {
+func New(config *viper.Viper) (*Client, error) {
+	if err := santizeConfig(config); err != nil {
 		return nil, err
 	}
-	if err := santizeConfig(); err != nil {
-		return nil, err
-	}
-	timeout := viper.GetInt("timeout")
+	timeout := config.GetInt("lwInternalApi.timeout")
 	if timeout == 0 {
 		timeout = 20
 	}
+
 	httpClient := &http.Client{Timeout: time.Duration(time.Duration(timeout) * time.Second)}
-	client := Client{httpClient}
+
+	if config.GetBool("lwInternalApi.secure") != true {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		httpClient.Transport = tr
+	}
+	client := Client{config, httpClient}
 	return &client, nil
 }
 
 func (client *Client) Call(method string, params interface{}) (interface{}, error) {
+	thisViper := client.config
 	// internal api wants the "params" prefix key. Do it here so consumers dont have
 	// to do this everytime.
 	args := map[string]interface{}{
@@ -43,13 +51,13 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		return nil, encodeErr
 	}
 	// formulate the HTTP POST request
-	url := fmt.Sprintf("%s/%s", viper.GetString("url"), method)
+	url := fmt.Sprintf("%s/%s", thisViper.GetString("lwInternalApi.url"), method)
 	req, reqErr := http.NewRequest("POST", url, bytes.NewReader(encodedArgs))
 	if reqErr != nil {
 		return nil, reqErr
 	}
 	// HTTP basic auth
-	req.SetBasicAuth(viper.GetString("user"), viper.GetString("pw"))
+	req.SetBasicAuth(thisViper.GetString("lwInternalApi.username"), thisViper.GetString("lwInternalApi.password"))
 	// make the POST request
 	resp, doErr := client.httpClient.Do(req)
 	if doErr != nil {
@@ -57,7 +65,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, viper.GetString("url"))
+		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, thisViper.GetString("lwInternalApi.url"))
 	}
 	// read the response body into a byte slice
 	bsRb, readErr := ioutil.ReadAll(resp.Body)
@@ -84,29 +92,20 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		}
 	}
 	// no LW errors so return the decoded response
-	return mapDecodedResp, nil
+	return decodedResp, nil
 }
 
 /* private */
 
-func initConfig() error {
-	viper.SetConfigName(".go-lwInternalApi") // name of config file (without extension)
-	viper.AddConfigPath("/usr/local/lp/etc") // adding home directory as first search path
-	if err := viper.ReadInConfig(); err != nil {
-		return err
+func santizeConfig(config *viper.Viper) error {
+	if config.GetString("lwInternalApi.username") == "" {
+		return fmt.Errorf("lwInternalApi.username is missing from config file: [%s]", config.ConfigFileUsed())
 	}
-	return nil
-}
-
-func santizeConfig() error {
-	if viper.GetString("user") == "" {
-		return fmt.Errorf("user is missing from config file: [%s]", viper.ConfigFileUsed())
+	if config.GetString("lwInternalApi.password") == "" {
+		return fmt.Errorf("lwInternalApi.password is missing from config file: [%s]", config.ConfigFileUsed())
 	}
-	if viper.GetString("pw") == "" {
-		return fmt.Errorf("pw is missing from config file: [%s]", viper.ConfigFileUsed())
-	}
-	if viper.GetString("url") == "" {
-		return fmt.Errorf("url is missing from config file: [%s]", viper.ConfigFileUsed())
+	if config.GetString("lwInternalApi.url") == "" {
+		return fmt.Errorf("lwInternalApi.url is missing from config file: [%s]", config.ConfigFileUsed())
 	}
 	return nil
 }
