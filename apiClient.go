@@ -16,6 +16,17 @@ type Client struct {
 	httpClient *http.Client
 }
 
+type LWError struct {
+	Class   string
+	Message string
+	Full    interface{}
+}
+
+func (e LWError) Error() string {
+	return fmt.Sprintf("%v: %v [%+v]", e.Class, e.Message, e.Full)
+}
+
+
 /* public */
 
 func New(config *viper.Viper) (*Client, error) {
@@ -87,7 +98,11 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		switch t := value.(type) {
 		case string:
 			if t != "" {
-				return nil, fmt.Errorf("%s: %+v", value, mapDecodedResp)
+				return nil, LWError{
+					value.(string),
+					mapDecodedResp["full_message"].(string),
+					mapDecodedResp,
+				}
 			}
 		}
 	}
