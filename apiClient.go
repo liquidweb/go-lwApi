@@ -2,13 +2,14 @@ package lwInternalApi
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
 	"time"
-	"crypto/tls"
+
+	"github.com/spf13/viper"
 )
 
 type Client struct {
@@ -16,16 +17,24 @@ type Client struct {
 	httpClient *http.Client
 }
 
-type LWError struct {
-	Class   string
-	Message string
-	Full    interface{}
+type LWAPIError struct {
+	ErrorMsg     string `json:"error,omitempty"`
+	ErrorClass   string `json:"error_class,omitempty"`
+	ErrorFullMsg string `json:"full_message,omitempty"`
 }
 
-func (e LWError) Error() string {
-	return fmt.Sprintf("%v: %v [%+v]", e.Class, e.Message, e.Full)
+func (e LWAPIError) Error() string {
+	return fmt.Sprintf("%v: %v", e.ErrorClass, e.ErrorFullMsg)
 }
 
+func (e LWAPIError) HadError() bool {
+	return e.ErrorClass != ""
+}
+
+type LWAPIRes interface {
+	Error() string
+	HadError() bool
+}
 
 /* public */
 
@@ -50,7 +59,84 @@ func New(config *viper.Viper) (*Client, error) {
 	return &client, nil
 }
 
+// Call takes a path, such as "network/zone/details" and a params structure.
+// It is recommended that the params be a map[string]interface{}, but you can use
+// anything that serializes to the right json structure.
+// A `interface{}` and an error are returned, in typical go fasion.
 func (client *Client) Call(method string, params interface{}) (interface{}, error) {
+	bsRb, err := client.CallRaw(method, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// json decode into interface
+	var decodedResp interface{}
+	if jsonDecodeErr := json.Unmarshal(bsRb, &decodedResp); jsonDecodeErr != nil {
+		return nil, jsonDecodeErr
+	}
+	mapDecodedResp := decodedResp.(map[string]interface{})
+	errorClass, ok := mapDecodedResp["error_class"]
+	if ok {
+		errorClassStr := errorClass.(string)
+		if errorClassStr != "" {
+			return nil, LWAPIError{
+				ErrorClass:   errorClassStr,
+				ErrorFullMsg: mapDecodedResp["full_message"].(string),
+				ErrorMsg:     mapDecodedResp["error"].(string),
+			}
+		}
+	}
+	// no LW errors so return the decoded response
+	return decodedResp, nil
+}
+
+// CallInto is like call, but instead of returning an interface you pass it a
+// struct which is filled, much like the json.Unmarshal function.  The struct
+// you pass must satisfy the LWAPIRes interface.  If you embed the LWAPIError
+// struct from this package into your struct, this will be taken care of for you.
+//
+// Example:
+//	type ZoneDetails struct {
+//		lwInternalApi.LWAPIError
+//		AvlZone     string   `json:"availability_zone"`
+//		Desc        string   `json:"description"`
+//		GatewayDevs []string `json:"gateway_devices"`
+//		HvType      string   `json:"hv_type"`
+//		ID          int      `json:"id"`
+//		Legacy      int      `json:"legacy"`
+//		Name        string   `json:"name"`
+//		Status      string   `json:"status"`
+//		SourceHVs   []string `json:"valid_source_hvs"`
+//	}
+//	var zone ZoneDetails
+//	err = apiClient.CallInto("network/zone/details", paramers, &zone)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Printf("Got struct %#v\n", zone)
+//
+func (client *Client) CallInto(method string, params interface{}, into LWAPIRes) error {
+	bsRb, err := client.CallRaw(method, params)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(bsRb, into)
+	if err != nil {
+		return err
+	}
+
+	if into.HadError() {
+		// the LWAPIRes satisfies the Error interface, so we can just return it on
+		// error.
+		return into
+	}
+
+	return nil
+}
+
+// CallRaw is just like Call, except it returns the raw json as a byte slice.
+func (client *Client) CallRaw(method string, params interface{}) ([]byte, error) {
 	thisViper := client.config
 	// internal api wants the "params" prefix key. Do it here so consumers dont have
 	// to do this everytime.
@@ -76,38 +162,15 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, thisViper.GetString("lwInternalApi.url"))
+		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, url)
 	}
 	// read the response body into a byte slice
 	bsRb, readErr := ioutil.ReadAll(resp.Body)
 	if readErr != nil {
 		return nil, readErr
 	}
-	// json decode into interface
-	var decodedResp interface{}
-	if jsonDecodeErr := json.Unmarshal(bsRb, &decodedResp); jsonDecodeErr != nil {
-		return nil, jsonDecodeErr
-	}
-	mapDecodedResp := decodedResp.(map[string]interface{})
-	// handle LW specific error responses
-	errConditions := map[string]interface{}{
-		"error_class": mapDecodedResp["error_class"],
-		"error":       mapDecodedResp["error"],
-	}
-	for _, value := range errConditions {
-		switch t := value.(type) {
-		case string:
-			if t != "" {
-				return nil, LWError{
-					value.(string),
-					mapDecodedResp["full_message"].(string),
-					mapDecodedResp,
-				}
-			}
-		}
-	}
-	// no LW errors so return the decoded response
-	return decodedResp, nil
+
+	return bsRb, nil
 }
 
 /* private */
