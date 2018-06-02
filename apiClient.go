@@ -92,7 +92,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 
 // CallInto is like call, but instead of returning an interface you pass it a
 // struct which is filled, much like the json.Unmarshal function.  The struct
-// you pass must statisfy the LWAPIRes interface.  If you embed the LWAPIError
+// you pass must satisfy the LWAPIRes interface.  If you embed the LWAPIError
 // struct from this package into your struct, this will be taken care of for you.
 //
 // Example:
