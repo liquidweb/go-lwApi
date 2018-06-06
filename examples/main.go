@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	lwInternalApi "github.com/liquidweb/go-lwInternalApi"
+
+	lwApi "github.com/liquidweb/go-lwApi"
 	"github.com/spf13/viper"
 )
 
 type ZoneDetails struct {
-	lwInternalApi.LWAPIError
+	lwApi.LWAPIError
 	AvlZone     string   `json:"availability_zone"`
 	Desc        string   `json:"description"`
 	GatewayDevs []string `json:"gateway_devices"`
@@ -21,14 +22,19 @@ type ZoneDetails struct {
 
 func main() {
 	config := viper.New()
-	config.SetConfigName(".go-lwInternalApi")
-	config.AddConfigPath("/usr/local/lp/etc")
+	config.SetConfigName("lwApi")
+	config.AddConfigPath(".")
 	// Match environment variables as well
 	config.AutomaticEnv()
 
-	config.ReadInConfig()
+	viperErr := config.ReadInConfig()
+	if viperErr != nil {
+		panic(viperErr)
+	}
 
-	apiClient, iErr := lwInternalApi.New(config)
+	config.Debug()
+
+	apiClient, iErr := lwApi.New(config)
 	if iErr != nil {
 		panic(iErr)
 	}

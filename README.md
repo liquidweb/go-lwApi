@@ -1,24 +1,54 @@
-# go-lwInternalApi
-LiquidWeb Internal API Golang client
+# go-lwApi
+LiquidWeb  API Golang client
 ## Setting up Authentication
-This package reads `/usr/local/lp/etc/.go-lwInternalApi.{toml,yaml,json}` for authentication details. Example:
-```sh
-ssullivan@data ~/golang/src/github.com/liquidweb/go-lwInternalApi $ cat /usr/local/lp/etc/.go-lwInternalApi.toml 
-user = "SUPERDUPERUSER"
-pw = "SUPERDUPERPW"
-url = "https://api-internal.ssullivan.dev.liquidweb.com:20800"
+When creating an api client, it expects to be configured with a viper config. Here is an example of how to get an api client.
+
+```
+package main
+
+import (
+	"fmt"
+
+	lwApi "github.com/liquidweb/go-lwApi"
+	"github.com/spf13/viper"
+)
+
+func main() {
+	config := viper.New()
+	config.SetConfigName("lwApi")
+	config.AddConfigPath(".")
+	// Match environment variables as well
+	config.AutomaticEnv()
+
+	viperErr := config.ReadInConfig()
+	if viperErr != nil {
+		panic(viperErr)
+	}
+
+	config.Debug()
+
+	apiClient, iErr := lwApi.New(config)
+}
+```
+
+In this scenario, we rely on a configuration file in the current working directory named lwApi.{toml,yaml,json} to set up a viper client.
+This file might look like the following example:
+``` toml
+[lwApi]
+username = "SUPERDUPERUSER"
+password = "SUPERDUPERPW"
+url = "https://api.stormondemand.com"
 timeout = 15
-ssullivan@data ~/golang/src/github.com/liquidweb/go-lwInternalApi $ 
 ```
 ## Importing
 ``` go
 import (
-        lwInternalApi "github.com/liquidweb/go-lwInternalApi"
+        lwApi "github.com/liquidweb/go-lwApi"
 )
 ```
 ## Calling a method
 ``` go
-apiClient, iErr := lwInternalApi.New()
+apiClient, iErr := lwApi.New(config)
 if iErr != nil {
   panic(iErr)
 }

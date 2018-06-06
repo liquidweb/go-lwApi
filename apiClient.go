@@ -1,4 +1,4 @@
-package lwInternalApi
+package lwApi
 
 import (
 	"bytes"
@@ -42,14 +42,14 @@ func New(config *viper.Viper) (*Client, error) {
 	if err := santizeConfig(config); err != nil {
 		return nil, err
 	}
-	timeout := config.GetInt("lwInternalApi.timeout")
+	timeout := config.GetInt("lwApi.timeout")
 	if timeout == 0 {
 		timeout = 20
 	}
 
 	httpClient := &http.Client{Timeout: time.Duration(time.Duration(timeout) * time.Second)}
 
-	if config.GetBool("lwInternalApi.secure") != true {
+	if config.GetBool("lwApi.secure") != true {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -97,7 +97,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 //
 // Example:
 //	type ZoneDetails struct {
-//		lwInternalApi.LWAPIError
+//		lwApi.LWAPIError
 //		AvlZone     string   `json:"availability_zone"`
 //		Desc        string   `json:"description"`
 //		GatewayDevs []string `json:"gateway_devices"`
@@ -138,7 +138,7 @@ func (client *Client) CallInto(method string, params interface{}, into LWAPIRes)
 // CallRaw is just like Call, except it returns the raw json as a byte slice.
 func (client *Client) CallRaw(method string, params interface{}) ([]byte, error) {
 	thisViper := client.config
-	// internal api wants the "params" prefix key. Do it here so consumers dont have
+	//  api wants the "params" prefix key. Do it here so consumers dont have
 	// to do this everytime.
 	args := map[string]interface{}{
 		"params": params,
@@ -148,13 +148,13 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 		return nil, encodeErr
 	}
 	// formulate the HTTP POST request
-	url := fmt.Sprintf("%s/%s", thisViper.GetString("lwInternalApi.url"), method)
+	url := fmt.Sprintf("%s/%s", thisViper.GetString("lwApi.url"), method)
 	req, reqErr := http.NewRequest("POST", url, bytes.NewReader(encodedArgs))
 	if reqErr != nil {
 		return nil, reqErr
 	}
 	// HTTP basic auth
-	req.SetBasicAuth(thisViper.GetString("lwInternalApi.username"), thisViper.GetString("lwInternalApi.password"))
+	req.SetBasicAuth(thisViper.GetString("lwApi.username"), thisViper.GetString("lwApi.password"))
 	// make the POST request
 	resp, doErr := client.httpClient.Do(req)
 	if doErr != nil {
@@ -176,14 +176,14 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 /* private */
 
 func santizeConfig(config *viper.Viper) error {
-	if config.GetString("lwInternalApi.username") == "" {
-		return fmt.Errorf("lwInternalApi.username is missing from config file: [%s]", config.ConfigFileUsed())
+	if config.GetString("lwApi.username") == "" {
+		return fmt.Errorf("lwApi.username is missing from config file: [%s]", config.ConfigFileUsed())
 	}
-	if config.GetString("lwInternalApi.password") == "" {
-		return fmt.Errorf("lwInternalApi.password is missing from config file: [%s]", config.ConfigFileUsed())
+	if config.GetString("lwApi.password") == "" {
+		return fmt.Errorf("lwApi.password is missing from config file: [%s]", config.ConfigFileUsed())
 	}
-	if config.GetString("lwInternalApi.url") == "" {
-		return fmt.Errorf("lwInternalApi.url is missing from config file: [%s]", config.ConfigFileUsed())
+	if config.GetString("lwApi.url") == "" {
+		return fmt.Errorf("lwApi.url is missing from config file: [%s]", config.ConfigFileUsed())
 	}
 	return nil
 }
