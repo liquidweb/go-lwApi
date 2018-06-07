@@ -1,5 +1,8 @@
 # go-lwApi
-LiquidWeb  API Golang client
+LiquidWeb API Golang client
+
+https://godoc.org/github.com/liquidweb/go-lwApi
+
 ## Setting up Authentication
 When creating an api client, it expects to be configured with a viper config. Here is an example of how to get an api client.
 
