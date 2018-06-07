@@ -1,3 +1,13 @@
+// Package lwApi is a minimalist API client to LiquidWeb's (https://www.liquidweb.com) API:
+//
+// https://cart.liquidweb.com/storm/api/docs/v1
+//
+// https://cart.liquidweb.com/storm/api/docs/bleed
+//
+// As you might have guessed from the above API documentation links, there are API versions:
+// "v1" and "bleed". As the name suggests, if you always want the latest features and abilities,
+// use "bleed". If you want long term compatibility (at the cost of being a little further behind
+// sometimes), use "v1".
 package lwApi
 
 import (
@@ -12,32 +22,55 @@ import (
 	"github.com/spf13/viper"
 )
 
+// A Client holds the packages *viper.Viper and *http.Client. To get a *Client, call New.
 type Client struct {
 	config     *viper.Viper
 	httpClient *http.Client
 }
 
+// A LWAPIError is used to identify error responses when JSON unmarshalling json from a
+// byte slice.
 type LWAPIError struct {
 	ErrorMsg     string `json:"error,omitempty"`
 	ErrorClass   string `json:"error_class,omitempty"`
 	ErrorFullMsg string `json:"full_message,omitempty"`
 }
 
+// Given a LWAPIError, returns a string containing the ErrorClass and ErrorFullMsg.
 func (e LWAPIError) Error() string {
 	return fmt.Sprintf("%v: %v", e.ErrorClass, e.ErrorFullMsg)
 }
 
+// Given a LWAPIError, returns boolean if ErrorClass was present or not. You can
+// use this function to determine if a LWAPIRes response indicates an error or not.
 func (e LWAPIError) HadError() bool {
 	return e.ErrorClass != ""
 }
 
+// LWAPIRes is a convenient interface used (for example) by CallInto to ensure a passed
+// struct knows how to indicate whether or not it had an error.
 type LWAPIRes interface {
 	Error() string
 	HadError() bool
 }
 
-/* public */
-
+// New takes a *viper.Viper, and gives you a *Client. If there's an error, it is returned.
+// When using this package, this should be the first function you call. Below is an example
+// that demonstrates creating the *viper.Viper and passing it to New.
+//
+// Example:
+//	config := viper.New()
+//	config.SetConfigName("lwApi")
+//	config.AddConfigPath(".")
+//	// Match environment variables as well
+//	config.AutomaticEnv()
+//	if viperErr := config.ReadInConfig(); viperErr != nil {
+//		panic(viperErr)
+//	}
+//	apiClient, newErr := lwApi.New(config)
+//	if newErr != nil {
+//		panic(newErr)
+//	}
 func New(config *viper.Viper) (*Client, error) {
 	if err := santizeConfig(config); err != nil {
 		return nil, err
@@ -63,6 +96,15 @@ func New(config *viper.Viper) (*Client, error) {
 // It is recommended that the params be a map[string]interface{}, but you can use
 // anything that serializes to the right json structure.
 // A `interface{}` and an error are returned, in typical go fasion.
+//
+// Example:
+//	args := map[string]interface{}{
+//		"uniq_id": "ABC123",
+//	}
+//	got, gotErr := apiClient.Call("bleed/asset/details", args)
+//	if gotErr != nil {
+//		panic(gotErr)
+//	}
 func (client *Client) Call(method string, params interface{}) (interface{}, error) {
 	bsRb, err := client.CallRaw(method, params)
 	if err != nil {
@@ -135,7 +177,20 @@ func (client *Client) CallInto(method string, params interface{}, into LWAPIRes)
 	return nil
 }
 
-// CallRaw is just like Call, except it returns the raw json as a byte slice.
+// CallRaw is just like Call, except it returns the raw json as a byte slice. However, in contrast to
+// Call, CallRaw does *not* check the API response for LiquidWeb specific exceptions as defined in
+// the type LWAPIError. As such, if calling this function directly, you must check for LiquidWeb specific
+// exceptions yourself.
+//
+// Example:
+//	args := map[string]interface{}{
+//		"uniq_id": "ABC123",
+//	}
+//	got, gotErr := apiClient.CallRaw("bleed/asset/details", args)
+//	if gotErr != nil {
+//		panic(gotErr)
+//	}
+//	// Check got now for LiquidWeb specific exceptions, as described above.
 func (client *Client) CallRaw(method string, params interface{}) ([]byte, error) {
 	thisViper := client.config
 	//  api wants the "params" prefix key. Do it here so consumers dont have
