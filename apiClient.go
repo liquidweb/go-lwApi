@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -116,7 +117,10 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 	if jsonDecodeErr := json.Unmarshal(bsRb, &decodedResp); jsonDecodeErr != nil {
 		return nil, jsonDecodeErr
 	}
-	mapDecodedResp := decodedResp.(map[string]interface{})
+	mapDecodedResp, ok := decodedResp.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("endpoint did not return a JSON object")
+	}
 	errorClass, ok := mapDecodedResp["error_class"]
 	if ok {
 		errorClassStr := errorClass.(string)
