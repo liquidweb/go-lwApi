@@ -119,7 +119,7 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 	}
 	mapDecodedResp, ok := decodedResp.(map[string]interface{})
 	if !ok {
-		return nil, errors.New("endpoint did not return a JSON object")
+		return nil, errors.New("endpoint did not return the expected JSON structure")
 	}
 	errorClass, ok := mapDecodedResp["error_class"]
 	if ok {
