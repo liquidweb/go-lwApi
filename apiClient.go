@@ -25,8 +25,10 @@ import (
 
 // A Client holds the packages *viper.Viper and *http.Client. To get a *Client, call New.
 type Client struct {
-	config     *viper.Viper
-	httpClient *http.Client
+	config        *viper.Viper
+	httpClient    *http.Client
+	BeforeRequest func(*http.Request)
+	AfterRequest  func(*http.Request, *http.Response, time.Duration)
 }
 
 // A LWAPIError is used to identify error responses when JSON unmarshalling json from a
@@ -89,7 +91,10 @@ func New(config *viper.Viper) (*Client, error) {
 		}
 		httpClient.Transport = tr
 	}
-	client := Client{config, httpClient}
+	client := Client{
+		config:     config,
+		httpClient: httpClient,
+	}
 	return &client, nil
 }
 
@@ -214,12 +219,25 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 	}
 	// HTTP basic auth
 	req.SetBasicAuth(thisViper.GetString("lwApi.username"), thisViper.GetString("lwApi.password"))
+
+	if client.BeforeRequest != nil {
+		client.BeforeRequest(req)
+	}
+
 	// make the POST request
+	start := time.Now()
 	resp, doErr := client.httpClient.Do(req)
+	elapsed := time.Since(start)
+
 	if doErr != nil {
 		return nil, doErr
 	}
 	defer resp.Body.Close()
+
+	if client.AfterRequest != nil {
+		client.AfterRequest(req, resp, elapsed)
+	}
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, url)
 	}
