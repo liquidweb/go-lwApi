@@ -65,7 +65,7 @@ type LWAPIRes interface {
 
 // New takes a *LWAPIConfig, and gives you a *Client. If there's an error, it is returned.
 // When using this package, this should be the first function you call. Below is an example
-// that demonstrates creating the *viper.Viper and passing it to New.
+// that demonstrates creating the config and passing it to New.
 //
 // Example:
 //	config := LWAPIConfig{
