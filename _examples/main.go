@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	lwApi "github.com/liquidweb/go-lwApi"
-	"github.com/spf13/viper"
 )
 
 type ZoneDetails struct {
@@ -21,20 +20,12 @@ type ZoneDetails struct {
 }
 
 func main() {
-	config := viper.New()
-	config.SetConfigName("lwApi")
-	config.AddConfigPath(".")
-	// Match environment variables as well
-	config.AutomaticEnv()
-
-	viperErr := config.ReadInConfig()
-	if viperErr != nil {
-		panic(viperErr)
+	config := lwApi.LWAPIConfig{
+		Username: "ExampleUsername",
+		Password: "ExamplePassword",
+		Url:      "api.liquidweb.com",
 	}
-
-	config.Debug()
-
-	apiClient, iErr := lwApi.New(config)
+	apiClient, iErr := lwApi.New(&config)
 	if iErr != nil {
 		panic(iErr)
 	}

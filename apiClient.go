@@ -19,13 +19,20 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"github.com/spf13/viper"
 )
 
-// A Client holds the packages *viper.Viper and *http.Client. To get a *Client, call New.
+// A LWAPIConfig holds the
+type LWAPIConfig struct {
+	Username string
+	Password string
+	Url      string
+	Timeout  uint
+	Secure   bool
+}
+
+// A Client holds the packages *LWAPIConfig and *http.Client. To get a *Client, call New.
 type Client struct {
-	config     *viper.Viper
+	config     *LWAPIConfig
 	httpClient *http.Client
 }
 
@@ -55,35 +62,28 @@ type LWAPIRes interface {
 	HadError() bool
 }
 
-// New takes a *viper.Viper, and gives you a *Client. If there's an error, it is returned.
+// New takes a *LWAPIConfig, and gives you a *Client. If there's an error, it is returned.
 // When using this package, this should be the first function you call. Below is an example
 // that demonstrates creating the *viper.Viper and passing it to New.
 //
 // Example:
-//	config := viper.New()
-//	config.SetConfigName("lwApi")
-//	config.AddConfigPath(".")
-//	// Match environment variables as well
-//	config.AutomaticEnv()
-//	if viperErr := config.ReadInConfig(); viperErr != nil {
-//		panic(viperErr)
+//	config := LWAPIConfig{
+//		Username: "ExampleUsername",
+//		Password: "ExamplePassword",
+//		Url:      "api.liquidweb.com",
 //	}
-//	apiClient, newErr := lwApi.New(config)
+//	apiClient, newErr := lwApi.New(&config)
 //	if newErr != nil {
 //		panic(newErr)
 //	}
-func New(config *viper.Viper) (*Client, error) {
-	if err := santizeConfig(config); err != nil {
+func New(config *LWAPIConfig) (*Client, error) {
+	if err := processConfig(config); err != nil {
 		return nil, err
 	}
-	timeout := config.GetInt("lwApi.timeout")
-	if timeout == 0 {
-		timeout = 20
-	}
 
-	httpClient := &http.Client{Timeout: time.Duration(time.Duration(timeout) * time.Second)}
+	httpClient := &http.Client{Timeout: time.Duration(time.Duration(config.Timeout) * time.Second)}
 
-	if config.GetBool("lwApi.secure") != true {
+	if config.Secure != true {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -196,7 +196,7 @@ func (client *Client) CallInto(method string, params interface{}, into LWAPIRes)
 //	}
 //	// Check got now for LiquidWeb specific exceptions, as described above.
 func (client *Client) CallRaw(method string, params interface{}) ([]byte, error) {
-	thisViper := client.config
+	config := client.config
 	//  api wants the "params" prefix key. Do it here so consumers dont have
 	// to do this everytime.
 	args := map[string]interface{}{
@@ -207,13 +207,13 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 		return nil, encodeErr
 	}
 	// formulate the HTTP POST request
-	url := fmt.Sprintf("%s/%s", thisViper.GetString("lwApi.url"), method)
+	url := fmt.Sprintf("%s/%s", config.Url, method)
 	req, reqErr := http.NewRequest("POST", url, bytes.NewReader(encodedArgs))
 	if reqErr != nil {
 		return nil, reqErr
 	}
 	// HTTP basic auth
-	req.SetBasicAuth(thisViper.GetString("lwApi.username"), thisViper.GetString("lwApi.password"))
+	req.SetBasicAuth(config.Username, config.Password)
 	// make the POST request
 	resp, doErr := client.httpClient.Do(req)
 	if doErr != nil {
@@ -234,15 +234,18 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 
 /* private */
 
-func santizeConfig(config *viper.Viper) error {
-	if config.GetString("lwApi.username") == "" {
-		return fmt.Errorf("lwApi.username is missing from config file: [%s]", config.ConfigFileUsed())
+func processConfig(config *LWAPIConfig) error {
+	if config.Username == "" {
+		return fmt.Errorf("username is missing from config")
 	}
-	if config.GetString("lwApi.password") == "" {
-		return fmt.Errorf("lwApi.password is missing from config file: [%s]", config.ConfigFileUsed())
+	if config.Password == "" {
+		return fmt.Errorf("password is missing from config file")
 	}
-	if config.GetString("lwApi.url") == "" {
-		return fmt.Errorf("lwApi.url is missing from config file: [%s]", config.ConfigFileUsed())
+	if config.Url == "" {
+		return fmt.Errorf("url is missing from config file")
+	}
+	if config.Timeout == 0 {
+		config.Timeout = 20
 	}
 	return nil
 }
