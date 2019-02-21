@@ -28,7 +28,7 @@ type LWAPIConfig struct {
 	Password string
 	Url      string
 	Timeout  uint
-	Secure   bool
+	Insecure bool
 }
 
 // A Client holds the packages *LWAPIConfig and *http.Client. To get a *Client, call New.
@@ -84,7 +84,7 @@ func New(config *LWAPIConfig) (*Client, error) {
 
 	httpClient := &http.Client{Timeout: time.Duration(time.Duration(config.Timeout) * time.Second)}
 
-	if config.Secure != true {
+	if config.Insecure {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
