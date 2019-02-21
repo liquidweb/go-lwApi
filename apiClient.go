@@ -21,7 +21,8 @@ import (
 	"time"
 )
 
-// A LWAPIConfig holds the
+// A LWAPIConfig holds the configuration details used to call
+// the API with the client.
 type LWAPIConfig struct {
 	Username string
 	Password string
