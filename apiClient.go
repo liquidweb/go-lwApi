@@ -239,10 +239,10 @@ func processConfig(config *LWAPIConfig) error {
 		return fmt.Errorf("username is missing from config")
 	}
 	if config.Password == "" {
-		return fmt.Errorf("password is missing from config file")
+		return fmt.Errorf("password is missing from config")
 	}
 	if config.Url == "" {
-		return fmt.Errorf("url is missing from config file")
+		return fmt.Errorf("url is missing from config")
 	}
 	if config.Timeout == 0 {
 		config.Timeout = 20
