@@ -4,7 +4,7 @@ LiquidWeb API Golang client
 https://godoc.org/github.com/liquidweb/go-lwApi
 
 ## Setting up Authentication
-When creating an api client, it expects to be configured with a viper config. Here is an example of how to get an api client.
+When creating an api client, it expects to be configured via a configuration struct. Here is an example of how to get an api client.
 
 ```
 package main
@@ -13,35 +13,16 @@ import (
 	"fmt"
 
 	lwApi "github.com/liquidweb/go-lwApi"
-	"github.com/spf13/viper"
 )
 
 func main() {
-	config := viper.New()
-	config.SetConfigName("lwApi")
-	config.AddConfigPath(".")
-	// Match environment variables as well
-	config.AutomaticEnv()
-
-	viperErr := config.ReadInConfig()
-	if viperErr != nil {
-		panic(viperErr)
+	config := lwApi.LWAPIConfig{
+		Username: "ExampleUsername",
+		Password: "ExamplePassword",
+		Url:      "api.liquidweb.com",
 	}
-
-	config.Debug()
-
-	apiClient, iErr := lwApi.New(config)
+	apiClient, iErr := lwApi.New(&config)
 }
-```
-
-In this scenario, we rely on a configuration file in the current working directory named lwApi.{toml,yaml,json} to set up a viper client.
-This file might look like the following example:
-``` toml
-[lwApi]
-username = "SUPERDUPERUSER"
-password = "SUPERDUPERPW"
-url = "https://api.stormondemand.com"
-timeout = 15
 ```
 ## Importing
 ``` go
@@ -51,7 +32,7 @@ import (
 ```
 ## Calling a method
 ``` go
-apiClient, iErr := lwApi.New(config)
+apiClient, iErr := lwApi.New(&config)
 if iErr != nil {
   panic(iErr)
 }
