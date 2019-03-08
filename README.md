@@ -1,7 +1,7 @@
 # go-lwApi
 LiquidWeb API Golang client
 
-https://godoc.org/github.com/liquidweb/go-lwApi
+[![GoDoc](https://godoc.org/github.com/liquidweb/go-lwApi?status.svg)](https://godoc.org/github.com/liquidweb/go-lwApi)
 
 ## Setting up Authentication
 When creating an api client, it expects to be configured via a configuration struct. Here is an example of how to get an api client.
