@@ -24,8 +24,9 @@ import (
 // A LWAPIConfig holds the configuration details used to call
 // the API with the client.
 type LWAPIConfig struct {
-	Username string
-	Password string
+	Username *string
+	Password *string
+	Token    *string
 	Url      string
 	Timeout  uint
 	Insecure bool
@@ -68,9 +69,12 @@ type LWAPIRes interface {
 // that demonstrates creating the config and passing it to New.
 //
 // Example:
-//	config := LWAPIConfig{
-//		Username: "ExampleUsername",
-//		Password: "ExamplePassword",
+//	username := "ExampleUsername"
+//	password := "ExamplePassword"
+//
+//	config := lwApi.LWAPIConfig{
+//		Username: &username,
+//		Password: &password,
 //		Url:      "api.liquidweb.com",
 //	}
 //	apiClient, newErr := lwApi.New(&config)
@@ -213,8 +217,17 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 	if reqErr != nil {
 		return nil, reqErr
 	}
-	// HTTP basic auth
-	req.SetBasicAuth(config.Username, config.Password)
+
+	if config.Token != nil {
+		// Oauth2 token
+		req.Header.Add("Bearer", *config.Token)
+	} else if config.Username != nil && config.Password != nil {
+		// HTTP basic auth
+		req.SetBasicAuth(*config.Username, *config.Password)
+	} else {
+		return nil, fmt.Errorf("No valid credential provided")
+	}
+
 	// make the POST request
 	resp, doErr := client.httpClient.Do(req)
 	if doErr != nil {
@@ -236,17 +249,29 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 /* private */
 
 func processConfig(config *LWAPIConfig) error {
-	if config.Username == "" {
-		return fmt.Errorf("username is missing from config")
-	}
-	if config.Password == "" {
-		return fmt.Errorf("password is missing from config")
-	}
 	if config.Url == "" {
 		return fmt.Errorf("url is missing from config")
 	}
 	if config.Timeout == 0 {
 		config.Timeout = 20
 	}
+
+	if config.Token != nil {
+		// Oauth2 token
+		if *config.Token == "" {
+			return fmt.Errorf("Bearer token provided, but empty")
+		}
+	} else if config.Username != nil && config.Password != nil {
+		// HTTP basic auth
+		if *config.Username == "" {
+			return fmt.Errorf("provided username is empty")
+		}
+		if *config.Password == "" {
+			return fmt.Errorf("provided password is empty")
+		}
+	} else {
+		return fmt.Errorf("No valid credential provided")
+	}
+
 	return nil
 }
