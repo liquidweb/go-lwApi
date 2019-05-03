@@ -20,9 +20,12 @@ type ZoneDetails struct {
 }
 
 func main() {
+	username := "ExampleUsername"
+	password := "ExamplePassword"
+
 	config := lwApi.LWAPIConfig{
-		Username: "ExampleUsername",
-		Password: "ExamplePassword",
+		Username: &username,
+		Password: &password,
 		Url:      "api.liquidweb.com",
 	}
 	apiClient, iErr := lwApi.New(&config)
