@@ -34,6 +34,7 @@ type LWAPIConfig struct {
 
 // A Client holds the packages *LWAPIConfig and *http.Client. To get a *Client, call New.
 type Client struct {
+	Headers    http.Header
 	config     *LWAPIConfig
 	httpClient *http.Client
 }
@@ -94,7 +95,13 @@ func New(config *LWAPIConfig) (*Client, error) {
 		}
 		httpClient.Transport = tr
 	}
-	client := Client{config, httpClient}
+
+	headers := make(http.Header)
+	client := Client{
+		config:     config,
+		httpClient: httpClient,
+		Headers:    headers,
+	}
 	return &client, nil
 }
 
@@ -217,6 +224,8 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 	if reqErr != nil {
 		return nil, reqErr
 	}
+
+	req.Header = client.Headers
 
 	if config.Token != nil {
 		// Oauth2 token
