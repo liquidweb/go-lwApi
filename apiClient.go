@@ -229,7 +229,7 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 
 	if config.Token != nil {
 		// Oauth2 token
-		req.Header.Add("Bearer", *config.Token)
+		req.Header.Add("Authorization", "Bearer " + *config.Token)
 	} else if config.Username != nil && config.Password != nil {
 		// HTTP basic auth
 		req.SetBasicAuth(*config.Username, *config.Password)
