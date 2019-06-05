@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -37,6 +38,7 @@ type Client struct {
 	Headers    http.Header
 	config     *LWAPIConfig
 	httpClient *http.Client
+	mutex      sync.Mutex
 }
 
 // A LWAPIError is used to identify error responses when JSON unmarshalling json from a
@@ -101,6 +103,7 @@ func New(config *LWAPIConfig) (*Client, error) {
 		config:     config,
 		httpClient: httpClient,
 		Headers:    headers,
+		mutex:      sync.Mutex{},
 	}
 	return &client, nil
 }
@@ -225,11 +228,19 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 		return nil, reqErr
 	}
 
-	req.Header = client.Headers
+	// We need a unique copy of the headers map in each request struct, otherwise
+	// we can end up with a concurrent map access and a panic.
+	client.mutex.Lock()
+	for name, value := range client.Headers {
+		newvalue := make([]string, len(value))
+		copy(newvalue, value)
+		req.Header[name] = newvalue
+	}
+	client.mutex.Unlock()
 
 	if config.Token != nil {
 		// Oauth2 token
-		req.Header.Add("Authorization", "Bearer " + *config.Token)
+		req.Header.Add("Authorization", "Bearer "+*config.Token)
 	} else if config.Username != nil && config.Password != nil {
 		// HTTP basic auth
 		req.SetBasicAuth(*config.Username, *config.Password)
