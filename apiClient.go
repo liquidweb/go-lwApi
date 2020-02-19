@@ -227,6 +227,7 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 	if reqErr != nil {
 		return nil, reqErr
 	}
+	req.Close = true
 
 	// We need a unique copy of the headers map in each request struct, otherwise
 	// we can end up with a concurrent map access and a panic.
