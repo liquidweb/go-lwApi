@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -127,28 +126,10 @@ func (client *Client) Call(method string, params interface{}) (interface{}, erro
 		return nil, err
 	}
 
-	// json decode into interface
-	var decodedResp interface{}
-	if jsonDecodeErr := json.Unmarshal(bsRb, &decodedResp); jsonDecodeErr != nil {
-		return nil, jsonDecodeErr
-	}
-	mapDecodedResp, ok := decodedResp.(map[string]interface{})
-	if !ok {
-		return nil, errors.New("endpoint did not return the expected JSON structure")
-	}
-	errorClass, ok := mapDecodedResp["error_class"]
-	if ok {
-		errorClassStr := errorClass.(string)
-		if errorClassStr != "" {
-			return nil, LWAPIError{
-				ErrorClass:   errorClassStr,
-				ErrorFullMsg: mapDecodedResp["full_message"].(string),
-				ErrorMsg:     mapDecodedResp["error"].(string),
-			}
-		}
-	}
-	// no LW errors so return the decoded response
-	return decodedResp, nil
+	var resp interface{}
+	resp, err = client.callRawRespToInterface(bsRb)
+
+	return resp, err
 }
 
 // CallInto is like call, but instead of returning an interface you pass it a
@@ -191,6 +172,36 @@ func (client *Client) CallInto(method string, params interface{}, into LWAPIRes)
 		// the LWAPIRes satisfies the Error interface, so we can just return it on
 		// error.
 		return into
+	}
+
+	return nil
+}
+
+// Similar to CallInto(), but populates an interface without needing to satisfy
+// the LWAPIRes interface.
+// Example:
+//      type ZoneDetails struct {
+//              AvlZone     string   `json:"availability_zone"`
+//              Desc        string   `json:"description"`
+//              GatewayDevs []string `json:"gateway_devices"`
+//              HvType      string   `json:"hv_type"`
+//              ID          int      `json:"id"`
+//              Legacy      int      `json:"legacy"`
+//              Name        string   `json:"name"`
+//              Status      string   `json:"status"`
+//              SourceHVs   []string `json:"valid_source_hvs"`
+//      }
+//      var zone ZoneDetails
+//      err = apiClient.CallIntoInterface("network/zone/details", params, &zone)
+
+func (client *Client) CallIntoInterface(method string, params interface{}, into interface{}) error {
+	bsRb, err := client.CallRaw(method, params)
+	if err != nil {
+		return err
+	}
+
+	if _, err = client.callRawRespToInterface(bsRb, &into); err != nil {
+		return err
 	}
 
 	return nil
@@ -294,4 +305,31 @@ func processConfig(config *LWAPIConfig) error {
 	}
 
 	return nil
+}
+
+func (client *Client) callRawRespToInterface(dataBytes []byte, into ...interface{}) (dataInter interface{}, err error) {
+	var raw map[string]interface{}
+	if err = json.Unmarshal(dataBytes, &raw); err == nil {
+		if errorClass, exists := raw["error_class"]; exists {
+			errorClassStr := fmt.Sprintf("%s", errorClass)
+			if errorClassStr != "" {
+				err = LWAPIError{
+					ErrorClass:   errorClassStr,
+					ErrorFullMsg: fmt.Sprintf("%s", raw["full_message"]),
+					ErrorMsg:     fmt.Sprintf("%s", raw["error"]),
+				}
+				return
+			}
+		}
+	} else {
+		return
+	}
+
+	if len(into) > 0 {
+		dataInter = &into[0]
+	}
+
+	err = json.Unmarshal(dataBytes, &dataInter)
+
+	return
 }
