@@ -193,7 +193,6 @@ func (client *Client) CallInto(method string, params interface{}, into LWAPIRes)
 //      }
 //      var zone ZoneDetails
 //      err = apiClient.CallIntoInterface("network/zone/details", params, &zone)
-
 func (client *Client) CallIntoInterface(method string, params interface{}, into interface{}) error {
 	bsRb, err := client.CallRaw(method, params)
 	if err != nil {
