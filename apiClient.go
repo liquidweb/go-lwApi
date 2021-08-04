@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 // A LWAPIConfig holds the configuration details used to call
@@ -206,6 +208,31 @@ func (client *Client) CallIntoInterface(method string, params interface{}, into 
 	return nil
 }
 
+// CallGJSON calls the given method with the given parameters.  It returns a gjson.Result
+// struct, which provides a very flexible interface to the returned data, and an error
+// in the typical go style.
+func (client *Client) CallGJSON(method string, params interface{}) (*gjson.Result, error) {
+	rawjson, err := client.CallRaw(method, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if !gjson.ValidBytes(rawjson) {
+		return nil, fmt.Errorf("invalid json returned from %s", method)
+	}
+
+	result := gjson.ParseBytes(rawjson)
+	if result.Get("error_class").Exists() {
+		return nil, LWAPIError{
+			ErrorMsg:     result.Get("error").String(),
+			ErrorClass:   result.Get("error_class").String(),
+			ErrorFullMsg: result.Get("full_message").String(),
+		}
+	}
+
+	return &result, nil
+}
+
 // CallRaw is just like Call, except it returns the raw json as a byte slice. However, in contrast to
 // Call, CallRaw does *not* check the API response for LiquidWeb specific exceptions as defined in
 // the type LWAPIError. As such, if calling this function directly, you must check for LiquidWeb specific
@@ -255,7 +282,7 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 		// HTTP basic auth
 		req.SetBasicAuth(*config.Username, *config.Password)
 	} else {
-		return nil, fmt.Errorf("No valid credential provided")
+		return nil, fmt.Errorf("no valid credential provided")
 	}
 
 	// make the POST request
@@ -265,7 +292,7 @@ func (client *Client) CallRaw(method string, params interface{}) ([]byte, error)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Bad HTTP response code [%d] from [%s]", resp.StatusCode, url)
+		return nil, fmt.Errorf("bad HTTP response code [%d] from [%s]", resp.StatusCode, url)
 	}
 	// read the response body into a byte slice
 	bsRb, readErr := ioutil.ReadAll(resp.Body)
@@ -289,7 +316,7 @@ func processConfig(config *LWAPIConfig) error {
 	if config.Token != nil {
 		// Oauth2 token
 		if *config.Token == "" {
-			return fmt.Errorf("Bearer token provided, but empty")
+			return fmt.Errorf("bearer token provided, but empty")
 		}
 	} else if config.Username != nil && config.Password != nil {
 		// HTTP basic auth
@@ -300,7 +327,7 @@ func processConfig(config *LWAPIConfig) error {
 			return fmt.Errorf("provided password is empty")
 		}
 	} else {
-		return fmt.Errorf("No valid credential provided")
+		return fmt.Errorf("no valid credential provided")
 	}
 
 	return nil
